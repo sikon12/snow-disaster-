@@ -1,353 +1,275 @@
--- Services
-local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Players = game:GetService("Players")
+local HttpService=game:GetService("HttpService")
+local RunService=game:GetService("RunService")
+local UserInputService=game:GetService("UserInputService")
+local Players=game:GetService("Players")
 
--- Global ImGui Runtime State (mirror real ImGui IO state)
-local ImGuiIO = {
-    WindowVisible = true,
-    DragActive = nil,
-    ResizeActive = nil,
-    WindowPos = UDim2.new(0.02,0,0.08,0),
-    WindowSize = UDim2.new(0,540,0,480),
-    MinSize = Vector2.new(380,300),
-    CustomBg = true,
-    BgColor = {0.11,0.11,0.13},
-    -- Dynamic tab storage (editable externally)
-    Tabs = {
-        {Name = "Main", Open = true},
-        {Name = "Script Loader", Open = true}
-    },
-    ActiveTabIndex = 1,
-    -- Widget value storage, external accessible
-    Values = {
-        ToggleBool = false,
-        SliderNum = 40,
-        DropdownSel = 1,
-        DropdownOpts = {"Option 1","Option 2","Custom"},
-        InputStr = "",
-        RemoteUrl = "",
-        ScriptCache = "",
-        SectionCollapsed = false
-    }
+local ImGuiCore={
+    WindowVisible=true,
+    DragActive=nil,
+    ResizeActive=nil,
+    WindowPos=UDim2.new(0.02,0,0.08,0),
+    WindowSize=UDim2.new(0,540,0,480),
+    MinSize=Vector2.new(380,300),
+    CustomBg=true,
+    BgColor={0.11,0.11,0.13},
+    TitleBarColor={0.17,0.37,0.85},
+    ButtonColor={0.21,0.33,0.55},
+    ToggleOnColor={0.18,0.7,0.32},
+    ToggleOffColor={0.7,0.18,0.32},
+    WindowTitle="Snow disaster HUB",
+    TabList={},
+    ActiveTab=nil,
+    WidgetStorage={}
 }
 
--- Create Root GUI Layer
-local RootGui = Instance.new("ScreenGui")
-RootGui.Name = "ImGuiInjectOverlay"
-RootGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-RootGui.ResetOnSpawn = false
-RootGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+local RootGui=Instance.new("ScreenGui")
+RootGui.Name="SnowImGuiOverlay"
+RootGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+RootGui.ResetOnSpawn=false
+RootGui.Parent=Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Main Window Container
-local WinFrame = Instance.new("Frame")
-WinFrame.BorderSizePixel = 1
-WinFrame.BorderColor3 = Color3.new(0.3,0.3,0.36)
-WinFrame.ClipsDescendants = true
-WinFrame.Position = ImGuiIO.WindowPos
-WinFrame.Size = ImGuiIO.WindowSize
-WinFrame.BackgroundColor3 = Color3.new(ImGuiIO.BgColor[1],ImGuiIO.BgColor[2],ImGuiIO.BgColor[3])
-WinFrame.Parent = RootGui
+local WinFrame=Instance.new("Frame")
+WinFrame.BorderSizePixel=1
+WinFrame.BorderColor3=Color3.new(0.3,0.3,0.36)
+WinFrame.ClipsDescendants=true
+WinFrame.Position=ImGuiCore.WindowPos
+WinFrame.Size=ImGuiCore.WindowSize
+WinFrame.BackgroundColor3=Color3.new(ImGuiCore.BgColor[1],ImGuiCore.BgColor[2],ImGuiCore.BgColor[3])
+WinFrame.BackgroundTransparency=0.05
+WinFrame.Parent=RootGui
+local WinCorner=Instance.new("UICorner")
+WinCorner.CornerRadius=6
+WinCorner.Parent=WinFrame
 
--- Title Drag Bar
-local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1,0,0,28)
-TitleBar.BackgroundColor3 = Color3.new(0.17,0.37,0.85)
-TitleBar.Parent = WinFrame
+local TitleBar=Instance.new("Frame")
+TitleBar.Size=UDim2.new(1,0,0,28)
+TitleBar.BackgroundColor3=Color3.new(ImGuiCore.TitleBarColor[1],ImGuiCore.TitleBarColor[2],ImGuiCore.TitleBarColor[3])
+TitleBar.Parent=WinFrame
+local TitleCorner=Instance.new("UICorner")
+TitleCorner.CornerRadius=6
+TitleCorner.Parent=TitleBar
 
-local WinTitle = Instance.new("TextLabel")
-WinTitle.Text = "ImGui Inject Panel"
-WinTitle.Font = Enum.Font.GothamSemibold
-WinTitle.TextSize = 14
-WinTitle.Size = UDim2.new(1,-60,1,0)
-WinTitle.BackgroundTransparency = 1
-WinTitle.TextColor3 = Color3.new(1,1,1)
-WinTitle.Parent = TitleBar
+local WinTitleLabel=Instance.new("TextLabel")
+WinTitleLabel.Text=ImGuiCore.WindowTitle
+WinTitleLabel.Font=Enum.Font.GothamSemibold
+WinTitleLabel.TextSize=14
+WinTitleLabel.Size=UDim2.new(1,-30,1,0)
+WinTitleLabel.BackgroundTransparency=1
+WinTitleLabel.TextColor3=Color3.new(1,1,1)
+WinTitleLabel.Parent=TitleBar
 
-local MinBtn = Instance.new("TextButton")
-MinBtn.Text = "_"
-MinBtn.Size = UDim2.new(0,26,1,0)
-MinBtn.Position = UDim2.new(1,-56,0,0)
-MinBtn.BackgroundColor3 = Color3.new(0.15,0.6,0.3)
-MinBtn.TextColor3 = Color3.new(1,1,1)
-MinBtn.Parent = TitleBar
+local MinBtn=Instance.new("TextButton")
+MinBtn.Text="▲"
+MinBtn.Size=UDim2.new(0,26,1,0)
+MinBtn.Position=UDim2.new(1,-26,0,0)
+MinBtn.BackgroundColor3=Color3.new(0.15,0.6,0.3)
+MinBtn.TextColor3=Color3.new(1,1,1)
+MinBtn.Parent=TitleBar
+local MinCorner=Instance.new("UICorner")
+MinCorner.CornerRadius=4
+MinCorner.Parent=MinBtn
 
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Text = "X"
-CloseBtn.Size = UDim2.new(0,28,1,0)
-CloseBtn.Position = UDim2.new(1,-28,0,0)
-CloseBtn.BackgroundColor3 = Color3.new(0.8,0.15,0.15)
-CloseBtn.TextColor3 = Color3.new(1,1,1)
-CloseBtn.Parent = TitleBar
+local TabBarFrame=Instance.new("Frame")
+TabBarFrame.Size=UDim2.new(1,0,0,28)
+TabBarFrame.Position=UDim2.new(0,0,0,28)
+TabBarFrame.BackgroundColor3=Color3.new(0.14,0.14,0.17)
+TabBarFrame.Parent=WinFrame
+local TabBarCorner=Instance.new("UICorner")
+TabBarCorner.CornerRadius=4
+TabBarCorner.Parent=TabBarFrame
 
--- Tab Bar Container
-local TabBarFrame = Instance.new("Frame")
-TabBarFrame.Size = UDim2.new(1,0,0,28)
-TabBarFrame.Position = UDim2.new(0,0,0,28)
-TabBarFrame.BackgroundColor3 = Color3.new(0.14,0.14,0.17)
-TabBarFrame.Parent = WinFrame
+local ScrollContent=Instance.new("ScrollingFrame")
+ScrollContent.Position=UDim2.new(0,4,0,60)
+ScrollContent.Size=UDim2.new(1,-8,1,-68)
+ScrollContent.BackgroundTransparency=1
+ScrollContent.ScrollBarThickness=5
+ScrollContent.CanvasSize=UDim2.new(0,0,0,900)
+ScrollContent.ScrollBarCornerRadius=3
+ScrollContent.Parent=WinFrame
 
--- Scrollable Content Area
-local ScrollContent = Instance.new("ScrollingFrame")
-ScrollContent.Position = UDim2.new(0,4,0,60)
-ScrollContent.Size = UDim2.new(1,-8,1,-68)
-ScrollContent.BackgroundTransparency = 1
-ScrollContent.ScrollBarThickness = 5
-ScrollContent.CanvasSize = UDim2.new(0,0,0,900)
-ScrollContent.Parent = WinFrame
+local ResizeHandle=Instance.new("TextButton")
+ResizeHandle.Text="⤢"
+ResizeHandle.Font=Enum.Font.GothamBold
+ResizeHandle.TextSize=16
+ResizeHandle.Size=UDim2.new(0,22,0,22)
+ResizeHandle.Position=UDim2.new(1,-22,1,-22)
+ResizeHandle.BackgroundColor3=Color3.new(0.26,0.26,0.3)
+ResizeHandle.TextColor3=Color3.new(1,1,1)
+ResizeHandle.Parent=WinFrame
+local ResizeCorner=Instance.new("UICorner")
+ResizeCorner.CornerRadius=4
+ResizeCorner.Parent=ResizeHandle
 
--- Bottom Right Resize Handle
-local ResizeHandle = Instance.new("TextButton")
-ResizeHandle.Text = "⤢"
-ResizeHandle.Font = Enum.Font.GothamBold
-ResizeHandle.TextSize = 16
-ResizeHandle.Size = UDim2.new(0,22,0,22)
-ResizeHandle.Position = UDim2.new(1,-22,1,-22)
-ResizeHandle.BackgroundColor3 = Color3.new(0.26,0.26,0.3)
-ResizeHandle.TextColor3 = Color3.new(1,1,1)
-ResizeHandle.Parent = WinFrame
+local LayoutY=4
 
--- Layout Y Tracker
-local LayoutY = 4
-
--- Internal Widget Builders
-local function ClearContent()
+local function ClearCanvas()
     ScrollContent:ClearAllChildren()
-    LayoutY = 4
+    LayoutY=4
 end
 
-local function AddLabel(text)
-    local lbl = Instance.new("TextLabel")
-    lbl.Text = text
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 13
-    lbl.Size = UDim2.new(1,0,0,20)
-    lbl.Position = UDim2.new(0,0,0,LayoutY)
-    lbl.BackgroundTransparency = 1
-    lbl.TextColor3 = Color3.new(0.94,0.94,0.94)
-    lbl.Parent = ScrollContent
-    LayoutY += 26
+local function CreateTextLabel(text)
+    local lbl=Instance.new("TextLabel")
+    lbl.Text=text
+    lbl.Font=Enum.Font.Gotham
+    lbl.TextSize=13
+    lbl.Size=UDim2.new(1,0,0,20)
+    lbl.Position=UDim2.new(0,0,0,LayoutY)
+    lbl.BackgroundTransparency=1
+    lbl.TextColor3=Color3.new(0.94,0.94,0.94)
+    lbl.Parent=ScrollContent
+    LayoutY=LayoutY+26
 end
 
-local function AddButton(text,callback)
-    local btn = Instance.new("TextButton")
-    btn.Text = text
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 12
-    btn.Size = UDim2.new(1,0,0,24)
-    btn.Position = UDim2.new(0,0,0,LayoutY)
-    btn.BackgroundColor3 = Color3.new(0.21,0.33,0.55)
-    btn.TextColor3 = Color3.new(1,1,1)
+local function CreateNormalButton(title,callback)
+    local btn=Instance.new("TextButton")
+    btn.Text=title
+    btn.Font=Enum.Font.Gotham
+    btn.TextSize=12
+    btn.Size=UDim2.new(1,0,0,24)
+    btn.Position=UDim2.new(0,0,0,LayoutY)
+    btn.BackgroundColor3=Color3.new(ImGuiCore.ButtonColor[1],ImGuiCore.ButtonColor[2],ImGuiCore.ButtonColor[3])
+    btn.TextColor3=Color3.new(1,1,1)
     btn.MouseButton1Click:Connect(callback)
-    btn.Parent = ScrollContent
-    LayoutY += 30
+    btn.Parent=ScrollContent
+    local BtnCorner=Instance.new("UICorner")
+    BtnCorner.CornerRadius=4
+    BtnCorner.Parent=btn
+    LayoutY=LayoutY+30
 end
 
-local function AddInput(hint,bindTable,key)
-    local box = Instance.new("TextBox")
-    box.PlaceholderText = hint
-    box.Text = bindTable[key]
-    box.Font = Enum.Font.Gotham
-    box.TextSize = 12
-    box.Size = UDim2.new(1,0,0,26)
-    box.Position = UDim2.new(0,0,0,LayoutY)
-    box.BackgroundColor3 = Color3.new(0.05,0.05,0.07)
-    box.BorderColor3 = Color3.new(0.36,0.36,0.42)
-    box.TextColor3 = Color3.new(1,1,1)
-    box.FocusLost:Connect(function(t) bindTable[key] = t end)
-    box.Parent = ScrollContent
-    LayoutY += 30
-end
-
--- Draw dynamic tab bar from ImGuiIO.Tabs
-local function DrawTabBar()
-    TabBarFrame:ClearAllChildren()
-    local tabCount = #ImGuiIO.Tabs
-    local tabWidth = 1/tabCount
-    for i,tabData in ipairs(ImGuiIO.Tabs) do
-        local tabBtn = Instance.new("TextButton")
-        tabBtn.Text = tabData.Name
-        tabBtn.Font = Enum.Font.Gotham
-        tabBtn.TextSize = 11
-        tabBtn.Size = UDim2.new(tabWidth,-2,1,-2)
-        tabBtn.Position = UDim2.new((i-1)*tabWidth,1,0,1)
-        tabBtn.BackgroundColor3 = ImGuiIO.ActiveTabIndex == i and Color3.new(0.25,0.43,0.87) or Color3.new(0.18,0.18,0.22)
-        tabBtn.TextColor3 = Color3.new(1,1,1)
-        tabBtn.MouseButton1Click:Connect(function() ImGuiIO.ActiveTabIndex = i end)
-        tabBtn.Parent = TabBarFrame
-    end
-end
-
--- Window Drag & Resize Logic
-TitleBar.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then ImGuiIO.DragActive = UserInputService:GetMouseLocation() end
-end)
-ResizeHandle.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then ImGuiIO.ResizeActive = UserInputService:GetMouseLocation() end
-end)
-UserInputService.InputChanged:Connect(function(i)
-    local m = UserInputService:GetMouseLocation()
-    if ImGuiIO.DragActive and i.UserInputType == Enum.UserInputType.MouseMovement then
-        local d = m - ImGuiIO.DragActive
-        ImGuiIO.WindowPos += UDim2.new(0,d.X,0,d.Y)
-        WinFrame.Position = ImGuiIO.WindowPos
-        ImGuiIO.DragActive = m
-    end
-    if ImGuiIO.ResizeActive and i.UserInputType == Enum.UserInputType.MouseMovement then
-        local d = m - ImGuiIO.ResizeActive
-        local nw = math.max(ImGuiIO.WindowSize.X.Offset + d.X, ImGuiIO.MinSize.X)
-        local nh = math.max(ImGuiIO.WindowSize.Y.Offset + d.Y, ImGuiIO.MinSize.Y)
-        ImGuiIO.WindowSize = UDim2.new(0,nw,0,nh)
-        WinFrame.Size = ImGuiIO.WindowSize
-        ImGuiIO.ResizeActive = m
-    end
-end)
-UserInputService.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then
-        ImGuiIO.DragActive = nil
-        ImGuiIO.ResizeActive = nil
-    end
-end)
-MinBtn.MouseButton1Click:Connect(function() ImGuiIO.WindowSize = UDim2.new(0,420,0,120) WinFrame.Size = ImGuiIO.WindowSize end)
-CloseBtn.MouseButton1Click:Connect(function() ImGuiIO.WindowVisible = not ImGuiIO.WindowVisible WinFrame.Visible = ImGuiIO.WindowVisible end)
-
--- ==============================
--- Global Exposed ImGui API (WindUI Simple Style, 1:1 Dear ImGui Logic)
--- Can call ALL THESE FUNCTIONS FROM EXTERNAL INJECTED SCRIPTS
--- ==============================
-ImGui = {}
-
--- Tab API: Create/Rename/Delete Tabs Externally
-function ImGui.BeginTabBar() DrawTabBar() end
-function ImGui.BeginTabItem(tabName)
-    -- Return tab index if exists, else create new tab
-    local idx = nil
-    for i,t in ipairs(ImGuiIO.Tabs) do
-        if t.Name == tabName then idx = i break end
-    end
-    if not idx then
-        table.insert(ImGuiIO.Tabs, {Name = tabName, Open = true})
-        idx = #ImGuiIO.Tabs
-    end
-    ImGuiIO.ActiveTabIndex = idx
-    return idx
-end
-function ImGui.RenameTab(oldName,newName)
-    for _,t in ipairs(ImGuiIO.Tabs) do
-        if t.Name == oldName then t.Name = newName break end
-    end
-end
-function ImGui.RemoveTab(tabName)
-    for i,t in ipairs(ImGuiIO.Tabs) do
-        if t.Name == tabName then table.remove(ImGuiIO.Tabs,i) break end
-    end
-end
-
--- Widget API (WindUI simple chain usage)
-function ImGui.Text(text) AddLabel(text) end
-function ImGui.Button(label,callback) AddButton(label,callback) end
-function ImGui.Checkbox(label,bindKey)
-    local val = ImGuiIO.Values[bindKey]
-    AddLabel(label..": "..tostring(val))
-    AddButton(val and "ON" or "OFF", function() ImGuiIO.Values[bindKey] = not ImGuiIO.Values[bindKey] end)
-end
-function ImGui.SliderFloat(label,bindKey,min,max,step)
-    local v = ImGuiIO.Values[bindKey]
-    AddLabel(label..": "..v)
-    AddButton(label.." +"..step, function() ImGuiIO.Values[bindKey] = math.clamp(v+step,min,max) end)
-    AddButton(label.." -"..step, function() ImGuiIO.Values[bindKey] = math.clamp(v-step,min,max) end)
-end
-function ImGui.InputText(hint,bindKey) AddInput(hint,ImGuiIO.Values,bindKey) end
-function ImGui.Combo(label,bindKey,optionsTable)
-    local sel = ImGuiIO.Values[bindKey]
-    AddLabel(label.." Selected: "..optionsTable[sel])
-    for i,opt in ipairs(optionsTable) do
-        AddButton("Select "..opt, function() ImGuiIO.Values[bindKey] = i end)
-    end
-end
-function ImGui.CollapsingHeader(label,bindKey)
-    local c = ImGuiIO.Values[bindKey]
-    AddButton(c and "[+] "..label or "[-] "..label, function() ImGuiIO.Values[bindKey] = not c end)
-    return not c
-end
-function ImGui.ColorEdit3(label)
-    AddLabel(label.." R: "..string.format("%.2f",ImGuiIO.BgColor[1]))
-    AddButton("R +0.05",function() ImGuiIO.BgColor[1]=math.clamp(ImGuiIO.BgColor[1]+0.05,0,1) end)
-    AddButton("R -0.05",function() ImGuiIO.BgColor[1]=math.clamp(ImGuiIO.BgColor[1]-0.05,0,1) end)
-    AddLabel(label.." G: "..string.format("%.2f",ImGuiIO.BgColor[2]))
-    AddButton("G +0.05",function() ImGuiIO.BgColor[2]=math.clamp(ImGuiIO.BgColor[2]+0.05,0,1) end)
-    AddButton("G -0.05",function() ImGuiIO.BgColor[2]=math.clamp(ImGuiIO.BgColor[2]-0.05,0,1) end)
-    AddLabel(label.." B: "..string.format("%.2f",ImGuiIO.BgColor[3]))
-    AddButton("B +0.05",function() ImGuiIO.BgColor[3]=math.clamp(ImGuiIO.BgColor[3]+0.05,0,1) end)
-    AddButton("B -0.05",function() ImGuiIO.BgColor[3]=math.clamp(ImGuiIO.BgColor[3]-0.05,0,1) end)
-    AddButton("Toggle Custom Background",function() ImGuiIO.CustomBg = not ImGuiIO.CustomBg end)
-end
--- Script Loader API
-function ImGui.LoadRemoteScript(urlKey)
-    local url = ImGuiIO.Values[urlKey]
-    if url == "" then warn("[ImGui] URL empty") return end
-    task.spawn(function()
-        local ok,src = pcall(HttpService.GetAsync,HttpService,url)
-        if ok then ImGuiIO.Values.ScriptCache = src print("[ImGui] Remote script loaded") else warn("[ImGui] Load fail: "..src) end
+local function CreateIconToggle(title,icon,defaultVal,callback)
+    local key=title..icon
+    ImGuiCore.WidgetStorage[key]=ImGuiCore.WidgetStorage[key]==nil and defaultVal or ImGuiCore.WidgetStorage[key]
+    local state=ImGuiCore.WidgetStorage[key]
+    CreateTextLabel("["..icon.."] "..title.." : "..tostring(state))
+    local toggleBtn=Instance.new("TextButton")
+    toggleBtn.Text=state and "开启" or "关闭"
+    toggleBtn.Font=Enum.Font.Gotham
+    toggleBtn.TextSize=12
+    toggleBtn.Size=UDim2.new(1,0,0,24)
+    toggleBtn.Position=UDim2.new(0,0,0,LayoutY-26)
+    toggleBtn.BackgroundColor3=state and Color3.new(ImGuiCore.ToggleOnColor[1],ImGuiCore.ToggleOnColor[2],ImGuiCore.ToggleOnColor[3]) or Color3.new(ImGuiCore.ToggleOffColor[1],ImGuiCore.ToggleOffColor[2],ImGuiCore.ToggleOffColor[3])
+    toggleBtn.TextColor3=Color3.new(1,1,1)
+    toggleBtn.MouseButton1Click:Connect(function()
+        ImGuiCore.WidgetStorage[key]=not ImGuiCore.WidgetStorage[key]
+        callback(ImGuiCore.WidgetStorage[key])
     end)
-end
-function ImGui.RunScriptCache()
-    local code = ImGuiIO.Values.ScriptCache
-    if #code < 4 then warn("[ImGui] Script empty") return end
-    local ok,err = pcall(loadstring(code))
-    if not ok then warn("[ImGui] Script error: "..err) else print("[ImGui] Script executed") end
+    toggleBtn.Parent=ScrollContent
+    local ToggleCorner=Instance.new("UICorner")
+    ToggleCorner.CornerRadius=4
+    ToggleCorner.Parent=toggleBtn
 end
 
--- Main Render Loop (Immediate Mode same as original ImGui)
-local function RenderImGui()
-    if not ImGuiIO.WindowVisible then return end
-    ClearContent()
-    -- Sync background color realtime
-    if ImGuiIO.CustomBg then WinFrame.BackgroundColor3 = Color3.new(ImGuiIO.BgColor[1],ImGuiIO.BgColor[2],ImGuiIO.BgColor[3]) else WinFrame.BackgroundColor3 = Color3.new(0.11,0.11,0.13) end
-    ImGui.BeginTabBar()
-    local activeTabData = ImGuiIO.Tabs[ImGuiIO.ActiveTabIndex]
-    if not activeTabData then return end
-    -- Render tab content (you can overwrite this block OR call ImGui functions externally)
-    local tabName = activeTabData.Name
-    if tabName == "Main" then
-        ImGui.Text("==== Standard ImGui Widgets ====")
-        local openSection = ImGui.CollapsingHeader("Control Group","SectionCollapsed")
-        if openSection then
-            ImGui.Checkbox("Global Toggle","ToggleBool")
-            ImGui.SliderFloat("Value Slider","SliderNum",0,100,5)
-            ImGui.Combo("Dropdown Select","DropdownSel",ImGuiIO.Values.DropdownOpts)
-            ImGui.InputText("Type Text Here","InputStr")
-            ImGui.Button("Test Action Button",function() print("[ImGui] Button pressed") end)
-        end
-    elseif tabName == "Script Loader" then
-        ImGui.Text("==== External Lua Script Loader ====")
-        ImGui.InputText("Remote Raw URL","RemoteUrl")
-        ImGui.Button("Fetch Remote Script",function() ImGui.LoadRemoteScript("RemoteUrl") end)
-        ImGui.InputText("Paste Script Code","ScriptCache")
-        ImGui.Button("Run External Script",function() ImGui.RunScriptCache() end)
-    elseif tabName == "Color Editor" then
-        ImGui.ColorEdit3("Window Background Color")
-        ImGui.Button("Reset Default Dark BG",function() ImGuiIO.BgColor = {0.11,0.11,0.13} end)
+local function RenderTabBar()
+    TabBarFrame:ClearAllChildren()
+    local tabCount=#ImGuiCore.TabList
+    if tabCount==0 then return end
+    local singleTabWidth=1/tabCount
+    for i,tabObj in ipairs(ImGuiCore.TabList)do
+        local tabBtn=Instance.new("TextButton")
+        tabBtn.Text=tabObj.Title
+        tabBtn.Font=Enum.Font.Gotham
+        tabBtn.TextSize=11
+        tabBtn.Size=UDim2.new(singleTabWidth,-2,1,-2)
+        tabBtn.Position=UDim2.new((i-1)*singleTabWidth,1,0,1)
+        tabBtn.BackgroundColor3=ImGuiCore.ActiveTab==tabObj and Color3.new(0.25,0.43,0.87) or Color3.new(0.18,0.18,0.22)
+        tabBtn.TextColor3=Color3.new(1,1,1)
+        tabBtn.MouseButton1Click:Connect(function() ImGuiCore.ActiveTab=tabObj end)
+        tabBtn.Parent=TabBarFrame
+        local TabBtnCorner=Instance.new("UICorner")
+        TabBtnCorner.CornerRadius=3
+        TabBtnCorner.Parent=tabBtn
     end
-    ScrollContent.CanvasSize = UDim2.new(0,0,0,LayoutY+30)
 end
 
-RunService.RenderStepped:Connect(RenderImGui)
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType==Enum.UserInputType.MouseButton1 then ImGuiCore.DragActive=UserInputService:GetMouseLocation() end
+end)
+ResizeHandle.InputBegan:Connect(function(input)
+    if input.UserInputType==Enum.UserInputType.MouseButton1 then ImGuiCore.ResizeActive=UserInputService:GetMouseLocation() end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    local mousePos=UserInputService:GetMouseLocation()
+    if ImGuiCore.DragActive and input.UserInputType==Enum.UserInputType.MouseMovement then
+        local delta=mousePos-ImGuiCore.DragActive
+        ImGuiCore.WindowPos=ImGuiCore.WindowPos+UDim2.new(0,delta.X,0,delta.Y)
+        WinFrame.Position=ImGuiCore.WindowPos
+        ImGuiCore.DragActive=mousePos
+    end
+    if ImGuiCore.ResizeActive and input.UserInputType==Enum.UserInputType.MouseMovement then
+        local delta=mousePos-ImGuiCore.ResizeActive
+        local newW=math.max(ImGuiCore.WindowSize.X.Offset+delta.X,ImGuiCore.MinSize.X)
+        local newH=math.max(ImGuiCore.WindowSize.Y.Offset+delta.Y,ImGuiCore.MinSize.Y)
+        ImGuiCore.WindowSize=UDim2.new(0,newW,0,newH)
+        WinFrame.Size=ImGuiCore.WindowSize
+        ImGuiCore.ResizeActive=mousePos
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType==Enum.UserInputType.MouseButton1 then
+        ImGuiCore.DragActive=nil
+        ImGuiCore.ResizeActive=nil
+    end
+end)
+MinBtn.MouseButton1Click:Connect(function()
+    if ImGuiCore.WindowSize.Y.Offset>130 then
+        ImGuiCore.WindowSize=UDim2.new(0,420,0,120)
+        MinBtn.Text="▼"
+    else
+        ImGuiCore.WindowSize=UDim2.new(0,540,0,480)
+        MinBtn.Text="▲"
+    end
+    WinFrame.Size=ImGuiCore.WindowSize
+end)
 
--- ==============================================
--- EXTERNAL USAGE EXAMPLE (paste in your injector script)
--- WindUI super simple syntax, same logic as real ImGui
--- ==============================================
-[[
--- Create new tab externally
-ImGui.BeginTabItem("My Custom Tab")
--- Rename tab
-ImGui.RenameTab("My Custom Tab","Player Tools")
--- Draw widgets inside your custom tab
-ImGui.Text("This is my custom external tab")
-ImGui.Button("Kill All NPCs",function() print("NPC kill triggered") end)
-ImGui.SliderFloat("Walk Speed","WalkSpeed",1,10,0.5)
--- Delete tab
-ImGui.RemoveTab("Player Tools")
-]]
+local TabClass={}
+TabClass.__index=TabClass
+function TabClass:Button(opt)
+    if ImGuiCore.ActiveTab~=self then return end
+    CreateNormalButton(opt.Title,opt.Callback)
+end
+function TabClass:Toggle(opt)
+    if ImGuiCore.ActiveTab~=self then return end
+    CreateIconToggle(opt.Title,opt.Icon,opt.Value,opt.Callback)
+end
+
+Window={}
+Tabs={}
+function Window:AddTab(tabName)
+    local newTab=setmetatable({Title=tabName},TabClass)
+    table.insert(ImGuiCore.TabList,newTab)
+    return newTab
+end
+
+ImGui={}
+function ImGui.SetWindowTitle(str)
+    ImGuiCore.WindowTitle=str
+    WinTitleLabel.Text=str
+end
+function ImGui.SetBgColor(r,g,b)
+    ImGuiCore.BgColor={r,g,b}
+end
+function ImGui.SetTitleBarColor(r,g,b)
+    ImGuiCore.TitleBarColor={r,g,b}
+    TitleBar.BackgroundColor3=Color3.new(r,g,b)
+end
+function ImGui.SetButtonColor(r,g,b)
+    ImGuiCore.ButtonColor={r,g,b}
+end
+function ImGui.SetToggleColor(onR,onG,onB,offR,offG,offB)
+    ImGuiCore.ToggleOnColor={onR,onG,onB}
+    ImGuiCore.ToggleOffColor={offR,offG,offB}
+end
+
+local function RenderImGui()
+    if not ImGuiCore.WindowVisible then return end
+    ClearCanvas()
+    if ImGuiCore.CustomBg then
+        WinFrame.BackgroundColor3=Color3.new(ImGuiCore.BgColor[1],ImGuiCore.BgColor[2],ImGuiCore.BgColor[3])
+    else
+        WinFrame.BackgroundColor3=Color3.new(0.11,0.11,0.13)
+    end
+    RenderTabBar()
+    ScrollContent.CanvasSize=UDim2.new(0,0,0,LayoutY+30)
+end
+RunService.RenderStepped:Connect(RenderImGui)
