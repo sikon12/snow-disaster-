@@ -1,275 +1,661 @@
 local HttpService=game:GetService("HttpService")
-local RunService=game:GetService("RunService")
+local RunService=game:GetService("UserInputService")
 local UserInputService=game:GetService("UserInputService")
+local TweenService=game:GetService("TweenService")
 local Players=game:GetService("Players")
+local StarterGui=game:GetService("StarterGui")
 
 local ImGuiCore={
     WindowVisible=true,
     DragActive=nil,
+    DragMouseOrigin=Vector2.new(0,0),
     ResizeActive=nil,
+    ResizeMouseOrigin=Vector2.new(0,0),
     WindowPos=UDim2.new(0.02,0,0.08,0),
     WindowSize=UDim2.new(0,540,0,480),
-    MinSize=Vector2.new(380,300),
-    CustomBg=true,
-    BgColor={0.11,0.11,0.13},
-    TitleBarColor={0.17,0.37,0.85},
-    ButtonColor={0.21,0.33,0.55},
-    ToggleOnColor={0.18,0.7,0.32},
-    ToggleOffColor={0.7,0.18,0.32},
+    MinWindowWidth=360,
+    MinWindowHeight=280,
+    MaxWindowWidth=1200,
+    MaxWindowHeight=800,
+    WindowTransparency=0.05,
+    CustomBgToggle=true,
+    BgRGB={0.11,0.11,0.13},
+    TitleBarRGB={0.17,0.37,0.85},
+    MainBtnRGB={0.21,0.33,0.55},
+    ToggleOnRGB={0.18,0.7,0.32},
+    ToggleOffRGB={0.7,0.18,0.32},
+    TabActiveRGB={0.25,0.43,0.87},
+    TabIdleRGB={0.18,0.18,0.22},
+    ScrollTrackRGB={0.09,0.09,0.11},
+    ScrollBarRGB={0.32,0.32,0.38},
+    BorderRGB={0.3,0.3,0.36},
+    TextMainRGB={0.94,0.94,0.94},
+    TextHintRGB={0.45,0.45,0.5},
+    InputBgRGB={0.05,0.05,0.07},
+    InputBorderRGB={0.36,0.36,0.42},
     WindowTitle="Snow disaster HUB",
     TabList={},
-    ActiveTab=nil,
-    WidgetStorage={}
+    ActiveTabObj=nil,
+    WidgetStorage={},
+    CollapseState={},
+    SliderCache={},
+    DropdownCache={},
+    InputCache={},
+    HoverTweens={},
+    WindowMinimized=false,
+    MinWindowHeight=120,
+    FullWindowHeight=480,
+    TooltipEnabled=true,
+    TooltipText="",
+    TooltipPos=Vector2.new(0,0),
+    TabSpacing=2,
+    WidgetVerticalSpacing=30,
+    LabelVerticalOffset=26,
+    GlobalFont=Enum.Font.Gotham,
+    TitleFont=Enum.Font.GothamSemibold,
+    FontSizeMain=13,
+    FontSizeSmall=11,
+    FontSizeBtn=12,
+    WindowCornerRadius=6,
+    WidgetCornerRadius=4,
+    TabCornerRadius=3,
+    ScrollCornerRadius=3,
+    StrokeThickness=1,
+    TweenSpeed=0.12,
+    HoverBrightenFactor=0.12
 }
 
-local RootGui=Instance.new("ScreenGui")
-RootGui.Name="SnowImGuiOverlay"
-RootGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
-RootGui.ResetOnSpawn=false
-RootGui.Parent=Players.LocalPlayer:WaitForChild("PlayerGui")
+local RootOverlay=Instance.new("ScreenGui")
+RootOverlay.Name="SnowImGuiFullOverlay"
+RootOverlay.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+RootOverlay.ResetOnSpawn=false
+RootOverlay.IgnoreGuiInset=true
+RootOverlay.DisplayOrder=9999
+RootOverlay.Parent=Players.LocalPlayer:WaitForChild("PlayerGui")
 
-local WinFrame=Instance.new("Frame")
-WinFrame.BorderSizePixel=1
-WinFrame.BorderColor3=Color3.new(0.3,0.3,0.36)
-WinFrame.ClipsDescendants=true
-WinFrame.Position=ImGuiCore.WindowPos
-WinFrame.Size=ImGuiCore.WindowSize
-WinFrame.BackgroundColor3=Color3.new(ImGuiCore.BgColor[1],ImGuiCore.BgColor[2],ImGuiCore.BgColor[3])
-WinFrame.BackgroundTransparency=0.05
-WinFrame.Parent=RootGui
-local WinCorner=Instance.new("UICorner")
-WinCorner.CornerRadius=6
-WinCorner.Parent=WinFrame
+local MainWindowFrame=Instance.new("Frame")
+MainWindowFrame.BorderSizePixel=ImGuiCore.StrokeThickness
+MainWindowFrame.BorderColor3=Color3.new(ImGuiCore.BorderRGB[1],ImGuiCore.BorderRGB[2],ImGuiCore.BorderRGB[3])
+MainWindowFrame.ClipsDescendants=true
+MainWindowFrame.Position=ImGuiCore.WindowPos
+MainWindowFrame.Size=ImGuiCore.WindowSize
+MainWindowFrame.BackgroundColor3=Color3.new(ImGuiCore.BgRGB[1],ImGuiCore.BgRGB[2],ImGuiCore.BgRGB[3])
+MainWindowFrame.BackgroundTransparency=ImGuiCore.WindowTransparency
+MainWindowFrame.Visible=ImGuiCore.WindowVisible
+MainWindowFrame.Parent=RootOverlay
+local WinUICorner=Instance.new("UICorner")
+WinUICorner.CornerRadius=ImGuiCore.WindowCornerRadius
+WinUICorner.Parent=MainWindowFrame
+local WinUIGradient=Instance.new("UIGradient")
+WinUIGradient.Rotation=90
+WinUIGradient.Color=ColorSequence.new(Color3.new(0,0,0),Color3.new(ImGuiCore.BgRGB[1]+0.06,ImGuiCore.BgRGB[2]+0.06,ImGuiCore.BgRGB[3]+0.06))
+WinUIGradient.Parent=MainWindowFrame
 
-local TitleBar=Instance.new("Frame")
-TitleBar.Size=UDim2.new(1,0,0,28)
-TitleBar.BackgroundColor3=Color3.new(ImGuiCore.TitleBarColor[1],ImGuiCore.TitleBarColor[2],ImGuiCore.TitleBarColor[3])
-TitleBar.Parent=WinFrame
-local TitleCorner=Instance.new("UICorner")
-TitleCorner.CornerRadius=6
-TitleCorner.Parent=TitleBar
+local TitleBarContainer=Instance.new("Frame")
+TitleBarContainer.Size=UDim2.new(1,0,0,28)
+TitleBarContainer.BackgroundColor3=Color3.new(ImGuiCore.TitleBarRGB[1],ImGuiCore.TitleBarRGB[2],ImGuiCore.TitleBarRGB[3])
+TitleBarContainer.Parent=MainWindowFrame
+local TitleUICorner=Instance.new("UICorner")
+TitleUICorner.CornerRadius=ImGuiCore.WindowCornerRadius
+TitleUICorner.Parent=TitleBarContainer
+local TitleGradient=Instance.new("UIGradient")
+TitleGradient.Rotation=180
+TitleGradient.Color=ColorSequence.new(Color3.new(ImGuiCore.TitleBarRGB[1]+0.08,ImGuiCore.TitleBarRGB[2]+0.08,ImGuiCore.TitleBarRGB[3]+0.08),Color3.new(ImGuiCore.TitleBarRGB[1],ImGuiCore.TitleBarRGB[2],ImGuiCore.TitleBarRGB[3]))
+TitleGradient.Parent=TitleBarContainer
 
-local WinTitleLabel=Instance.new("TextLabel")
-WinTitleLabel.Text=ImGuiCore.WindowTitle
-WinTitleLabel.Font=Enum.Font.GothamSemibold
-WinTitleLabel.TextSize=14
-WinTitleLabel.Size=UDim2.new(1,-30,1,0)
-WinTitleLabel.BackgroundTransparency=1
-WinTitleLabel.TextColor3=Color3.new(1,1,1)
-WinTitleLabel.Parent=TitleBar
+local TitleTextLabel=Instance.new("TextLabel")
+TitleTextLabel.Text=ImGuiCore.WindowTitle
+TitleTextLabel.Font=ImGuiCore.TitleFont
+TitleTextLabel.TextSize=ImGuiCore.FontSizeMain
+TitleTextLabel.Size=UDim2.new(1,-30,1,0)
+TitleTextLabel.BackgroundTransparency=1
+TitleTextLabel.TextColor3=Color3.new(1,1,1)
+TitleTextLabel.TextXAlignment=Enum.TextXAlignment.Left
+TitleTextLabel.Position=UDim2.new(6,0,0,0)
+TitleTextLabel.Parent=TitleBarContainer
 
-local MinBtn=Instance.new("TextButton")
-MinBtn.Text="▲"
-MinBtn.Size=UDim2.new(0,26,1,0)
-MinBtn.Position=UDim2.new(1,-26,0,0)
-MinBtn.BackgroundColor3=Color3.new(0.15,0.6,0.3)
-MinBtn.TextColor3=Color3.new(1,1,1)
-MinBtn.Parent=TitleBar
-local MinCorner=Instance.new("UICorner")
-MinCorner.CornerRadius=4
-MinCorner.Parent=MinBtn
+local MinimizeToggleBtn=Instance.new("TextButton")
+MinimizeToggleBtn.Text="▲"
+MinimizeToggleBtn.Size=UDim2.new(0,26,1,0)
+MinimizeToggleBtn.Position=UDim2.new(1,-26,0,0)
+MinimizeToggleBtn.BackgroundColor3=Color3.new(0.15,0.6,0.3)
+MinimizeToggleBtn.TextColor3=Color3.new(1,1,1)
+MinimizeToggleBtn.Font=ImGuiCore.GlobalFont
+MinimizeToggleBtn.TextSize=14
+MinimizeToggleBtn.AutoLocalize=false
+MinimizeToggleBtn.Parent=TitleBarContainer
+local MinBtnCorner=Instance.new("UICorner")
+MinBtnCorner.CornerRadius=ImGuiCore.WidgetCornerRadius
+MinBtnCorner.Parent=MinimizeToggleBtn
+local MinHoverTween=TweenService:Create(MinimizeToggleBtn,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=Color3.new(0.2,0.72,0.38)})
+local MinIdleTween=TweenService:Create(MinimizeToggleBtn,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=Color3.new(0.15,0.6,0.3)})
+MinimizeToggleBtn.MouseEnter:Connect(function() MinHoverTween:Play() end)
+MinimizeToggleBtn.MouseLeave:Connect(function() MinIdleTween:Play() end)
 
-local TabBarFrame=Instance.new("Frame")
-TabBarFrame.Size=UDim2.new(1,0,0,28)
-TabBarFrame.Position=UDim2.new(0,0,0,28)
-TabBarFrame.BackgroundColor3=Color3.new(0.14,0.14,0.17)
-TabBarFrame.Parent=WinFrame
+local TabBarHolder=Instance.new("Frame")
+TabBarHolder.Size=UDim2.new(1,0,0,28)
+TabBarHolder.Position=UDim2.new(0,0,0,28)
+TabBarHolder.BackgroundColor3=Color3.new(ImGuiCore.TabIdleRGB[1]-0.04,ImGuiCore.TabIdleRGB[2]-0.04,ImGuiCore.TabIdleRGB[3]-0.04)
+TabBarHolder.Parent=MainWindowFrame
 local TabBarCorner=Instance.new("UICorner")
-TabBarCorner.CornerRadius=4
-TabBarCorner.Parent=TabBarFrame
+TabBarCorner.CornerRadius=ImGuiCore.TabCornerRadius
+TabBarCorner.Parent=TabBarHolder
 
-local ScrollContent=Instance.new("ScrollingFrame")
-ScrollContent.Position=UDim2.new(0,4,0,60)
-ScrollContent.Size=UDim2.new(1,-8,1,-68)
-ScrollContent.BackgroundTransparency=1
-ScrollContent.ScrollBarThickness=5
-ScrollContent.CanvasSize=UDim2.new(0,0,0,900)
-ScrollContent.ScrollBarCornerRadius=3
-ScrollContent.Parent=WinFrame
+local MainScrollFrame=Instance.new("ScrollingFrame")
+MainScrollFrame.Position=UDim2.new(0,4,0,60)
+MainScrollFrame.Size=UDim2.new(1,-8,1,-68)
+MainScrollFrame.BackgroundTransparency=1
+MainScrollFrame.ScrollBarThickness=5
+MainScrollFrame.ScrollBarBackgroundColor=Color3.new(ImGuiCore.ScrollTrackRGB[1],ImGuiCore.ScrollTrackRGB[2],ImGuiCore.ScrollTrackRGB[3])
+MainScrollFrame.ScrollBarImageColor3=Color3.new(ImGuiCore.ScrollBarRGB[1],ImGuiCore.ScrollBarRGB[2],ImGuiCore.ScrollBarRGB[3])
+MainScrollFrame.ScrollBarCornerRadius=ImGuiCore.ScrollCornerRadius
+MainScrollFrame.CanvasSize=UDim2.new(0,0,0,1200)
+MainScrollFrame.ClipsDescendants=true
+MainScrollFrame.Parent=MainWindowFrame
 
-local ResizeHandle=Instance.new("TextButton")
-ResizeHandle.Text="⤢"
-ResizeHandle.Font=Enum.Font.GothamBold
-ResizeHandle.TextSize=16
-ResizeHandle.Size=UDim2.new(0,22,0,22)
-ResizeHandle.Position=UDim2.new(1,-22,1,-22)
-ResizeHandle.BackgroundColor3=Color3.new(0.26,0.26,0.3)
-ResizeHandle.TextColor3=Color3.new(1,1,1)
-ResizeHandle.Parent=WinFrame
+local ResizeDragHandle=Instance.new("TextButton")
+ResizeDragHandle.Text="⤢"
+ResizeDragHandle.Font=Enum.Font.GothamBold
+ResizeDragHandle.TextSize=16
+ResizeDragHandle.Size=UDim2.new(0,22,0,22)
+ResizeDragHandle.Position=UDim2.new(1,-22,1,-22)
+ResizeDragHandle.BackgroundColor3=Color3.new(ImGuiCore.ScrollTrackRGB[1]+0.03,ImGuiCore.ScrollTrackRGB[2]+0.03,ImGuiCore.ScrollTrackRGB[3]+0.03)
+ResizeDragHandle.TextColor3=Color3.new(ImGuiCore.TextMainRGB[1],ImGuiCore.TextMainRGB[2],ImGuiCore.TextMainRGB[3])
+ResizeDragHandle.AutoLocalize=false
+ResizeDragHandle.ZIndex=10
+ResizeDragHandle.Parent=MainWindowFrame
 local ResizeCorner=Instance.new("UICorner")
-ResizeCorner.CornerRadius=4
-ResizeCorner.Parent=ResizeHandle
+ResizeCorner.CornerRadius=ImGuiCore.WidgetCornerRadius
+ResizeCorner.Parent=ResizeDragHandle
+local ResizeHoverTween=TweenService:Create(ResizeDragHandle,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=Color3.new(ImGuiCore.ScrollBarRGB[1],ImGuiCore.ScrollBarRGB[2],ImGuiCore.ScrollBarRGB[3])})
+local ResizeIdleTween=TweenService:Create(ResizeDragHandle,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=Color3.new(ImGuiCore.ScrollTrackRGB[1]+0.03,ImGuiCore.ScrollTrackRGB[2]+0.03,ImGuiCore.ScrollTrackRGB[3]+0.03)})
+ResizeDragHandle.MouseEnter:Connect(function() ResizeHoverTween:Play() end)
+ResizeDragHandle.MouseLeave:Connect(function() ResizeIdleTween:Play() end
 
-local LayoutY=4
+local TooltipFrame=Instance.new("Frame")
+TooltipFrame.Size=UDim2.new(0,180,0,36)
+TooltipFrame.BackgroundColor3=Color3.new(0.06,0.06,0.08)
+TooltipFrame.BackgroundTransparency=0.1
+TooltipFrame.BorderSizePixel=1
+TooltipFrame.BorderColor3=Color3.new(0.4,0.4,0.48)
+TooltipFrame.Visible=false
+TooltipFrame.ZIndex=99
+TooltipFrame.Parent=RootOverlay
+local TooltipCorner=Instance.new("UICorner")
+TooltipCorner.CornerRadius=4
+TooltipCorner.Parent=TooltipFrame
+local TooltipLabel=Instance.new("TextLabel")
+TooltipLabel.Size=UDim2.new(1,-8,1,0)
+TooltipLabel.Position=UDim2.new(4,0,0,0)
+TooltipLabel.BackgroundTransparency=1
+TooltipLabel.Font=ImGuiCore.GlobalFont
+TooltipLabel.TextSize=11
+TooltipLabel.TextColor3=Color3.new(1,1,1)
+TooltipLabel.TextWrapped=true
+TooltipLabel.Parent=TooltipFrame
 
-local function ClearCanvas()
-    ScrollContent:ClearAllChildren()
-    LayoutY=4
+local CurrentLayoutY=4
+
+local function ClearScrollCanvas()
+    MainScrollFrame:ClearAllChildren()
+    CurrentLayoutY=4
 end
 
-local function CreateTextLabel(text)
-    local lbl=Instance.new("TextLabel")
-    lbl.Text=text
-    lbl.Font=Enum.Font.Gotham
-    lbl.TextSize=13
-    lbl.Size=UDim2.new(1,0,0,20)
-    lbl.Position=UDim2.new(0,0,0,LayoutY)
-    lbl.BackgroundTransparency=1
-    lbl.TextColor3=Color3.new(0.94,0.94,0.94)
-    lbl.Parent=ScrollContent
-    LayoutY=LayoutY+26
+local function CreateTextLabel(rawText,tooltipStr)
+    local LabelObj=Instance.new("TextLabel")
+    LabelObj.Text=rawText
+    LabelObj.Font=ImGuiCore.GlobalFont
+    LabelObj.TextSize=ImGuiCore.FontSizeMain
+    LabelObj.Size=UDim2.new(1,0,0,20)
+    LabelObj.Position=UDim2.new(0,0,0,CurrentLayoutY)
+    LabelObj.BackgroundTransparency=1
+    LabelObj.TextColor3=Color3.new(ImGuiCore.TextMainRGB[1],ImGuiCore.TextMainRGB[2],ImGuiCore.TextMainRGB[3])
+    LabelObj.TextXAlignment=Enum.TextXAlignment.Left
+    LabelObj.AutoLocalize=false
+    LabelObj.Parent=MainScrollFrame
+    if tooltipStr and ImGuiCore.TooltipEnabled then
+        LabelObj.MouseEnter:Connect(function()
+            TooltipLabel.Text=tooltipStr
+            TooltipFrame.Visible=true
+        end)
+        LabelObj.MouseMove:Connect(function(input)
+            local mPos=UserInputService:GetMouseLocation()
+            TooltipFrame.Position=UDim2.new(0,mPos.X+12,0,mPos.Y+12)
+        end)
+        LabelObj.MouseLeave:Connect(function()
+            TooltipFrame.Visible=false
+        end)
+    end
+    CurrentLayoutY=CurrentLayoutY+ImGuiCore.LabelVerticalOffset
+    return LabelObj
 end
 
-local function CreateNormalButton(title,callback)
-    local btn=Instance.new("TextButton")
-    btn.Text=title
-    btn.Font=Enum.Font.Gotham
-    btn.TextSize=12
-    btn.Size=UDim2.new(1,0,0,24)
-    btn.Position=UDim2.new(0,0,0,LayoutY)
-    btn.BackgroundColor3=Color3.new(ImGuiCore.ButtonColor[1],ImGuiCore.ButtonColor[2],ImGuiCore.ButtonColor[3])
-    btn.TextColor3=Color3.new(1,1,1)
-    btn.MouseButton1Click:Connect(callback)
-    btn.Parent=ScrollContent
+local function CreateSeparatorLine()
+    local Separator=Instance.new("Frame")
+    Separator.Size=UDim2.new(1,0,0,1)
+    Separator.Position=UDim2.new(0,0,0,CurrentLayoutY+8)
+    Separator.BackgroundColor3=Color3.new(ImGuiCore.BorderRGB[1]-0.06,ImGuiCore.BorderRGB[2]-0.06,ImGuiCore.BorderRGB[3]-0.06)
+    Separator.Parent=MainScrollFrame
+    CurrentLayoutY=CurrentLayoutY+16
+end
+
+local function CreateBaseButton(labelText,clickCallback,tooltipStr,overrideRGB)
+    local BtnObj=Instance.new("TextButton")
+    BtnObj.Text=labelText
+    BtnObj.Font=ImGuiCore.GlobalFont
+    BtnObj.TextSize=ImGuiCore.FontSizeBtn
+    BtnObj.Size=UDim2.new(1,0,0,24)
+    BtnObj.Position=UDim2.new(0,0,0,CurrentLayoutY)
+    local baseR,baseG,baseB=ImGuiCore.MainBtnRGB[1],ImGuiCore.MainBtnRGB[2],ImGuiCore.MainBtnRGB[3]
+    if overrideRGB then
+        baseR,baseG,baseB=overrideRGB[1],overrideRGB[2],overrideRGB[3]
+    end
+    BtnObj.BackgroundColor3=Color3.new(baseR,baseG,baseB)
+    BtnObj.TextColor3=Color3.new(1,1,1)
+    BtnObj.AutoLocalize=false
+    BtnObj.ZIndex=5
+    BtnObj.MouseButton1Click:Connect(clickCallback)
     local BtnCorner=Instance.new("UICorner")
-    BtnCorner.CornerRadius=4
-    BtnCorner.Parent=btn
-    LayoutY=LayoutY+30
+    BtnCorner.CornerRadius=ImGuiCore.WidgetCornerRadius
+    BtnCorner.Parent=BtnObj
+    local HoverR=math.clamp(baseR+ImGuiCore.HoverBrightenFactor,0,1)
+    local HoverG=math.clamp(baseG+ImGuiCore.HoverBrightenFactor,0,1)
+    local HoverB=math.clamp(baseB+ImGuiCore.HoverBrightenFactor,0,1)
+    local BtnHoverTween=TweenService:Create(BtnObj,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=Color3.new(HoverR,HoverG,HoverB)})
+    local BtnIdleTween=TweenService:Create(BtnObj,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=Color3.new(baseR,baseG,baseB)})
+    BtnObj.MouseEnter:Connect(function() BtnHoverTween:Play() end)
+    BtnObj.MouseLeave:Connect(function() BtnIdleTween:Play() end)
+    if tooltipStr and ImGuiCore.TooltipEnabled then
+        BtnObj.MouseEnter:Connect(function()
+            TooltipLabel.Text=tooltipStr
+            TooltipFrame.Visible=true
+        end)
+        BtnObj.MouseMove:Connect(function(input)
+            local mPos=UserInputService:GetMouseLocation()
+            TooltipFrame.Position=UDim2.new(0,mPos.X+12,0,mPos.Y+12)
+        end)
+        BtnObj.MouseLeave:Connect(function()
+            TooltipFrame.Visible=false
+        end)
+    end
+    BtnObj.Parent=MainScrollFrame
+    CurrentLayoutY=CurrentLayoutY+ImGuiCore.WidgetVerticalSpacing
+    return BtnObj
 end
 
-local function CreateIconToggle(title,icon,defaultVal,callback)
-    local key=title..icon
-    ImGuiCore.WidgetStorage[key]=ImGuiCore.WidgetStorage[key]==nil and defaultVal or ImGuiCore.WidgetStorage[key]
-    local state=ImGuiCore.WidgetStorage[key]
-    CreateTextLabel("["..icon.."] "..title.." : "..tostring(state))
-    local toggleBtn=Instance.new("TextButton")
-    toggleBtn.Text=state and "开启" or "关闭"
-    toggleBtn.Font=Enum.Font.Gotham
-    toggleBtn.TextSize=12
-    toggleBtn.Size=UDim2.new(1,0,0,24)
-    toggleBtn.Position=UDim2.new(0,0,0,LayoutY-26)
-    toggleBtn.BackgroundColor3=state and Color3.new(ImGuiCore.ToggleOnColor[1],ImGuiCore.ToggleOnColor[2],ImGuiCore.ToggleOnColor[3]) or Color3.new(ImGuiCore.ToggleOffColor[1],ImGuiCore.ToggleOffColor[2],ImGuiCore.ToggleOffColor[3])
-    toggleBtn.TextColor3=Color3.new(1,1,1)
-    toggleBtn.MouseButton1Click:Connect(function()
-        ImGuiCore.WidgetStorage[key]=not ImGuiCore.WidgetStorage[key]
-        callback(ImGuiCore.WidgetStorage[key])
-    end)
-    toggleBtn.Parent=ScrollContent
+local function CreateIconToggle(TitleStr,IconTag,DefaultBool,CallbackFunc,tooltipStr)
+    local cacheKey=TitleStr.."_"..IconTag
+    if ImGuiCore.WidgetStorage[cacheKey]==nil then
+        ImGuiCore.WidgetStorage[cacheKey]=DefaultBool
+    end
+    local currentState=ImGuiCore.WidgetStorage[cacheKey]
+    CreateTextLabel("["..IconTag.."] "..TitleStr.." : "..tostring(currentState),tooltipStr)
+    local ToggleBtn=Instance.new("TextButton")
+    ToggleBtn.Text=currentState and "开启" or "关闭"
+    ToggleBtn.Font=ImGuiCore.GlobalFont
+    ToggleBtn.TextSize=ImGuiCore.FontSizeBtn
+    ToggleBtn.Size=UDim2.new(1,0,0,24)
+    ToggleBtn.Position=UDim2.new(0,0,0,CurrentLayoutY-ImGuiCore.LabelVerticalOffset)
+    local rOn,gOn,bOn=ImGuiCore.ToggleOnRGB[1],ImGuiCore.ToggleOnRGB[2],ImGuiCore.ToggleOnRGB[3]
+    local rOff,gOff,bOff=ImGuiCore.ToggleOffRGB[1],ImGuiCore.ToggleOffRGB[2],ImGuiCore.ToggleOffRGB[3]
+    ToggleBtn.BackgroundColor3=currentState and Color3.new(rOn,gOn,bOn) or Color3.new(rOff,gOff,bOff)
+    ToggleBtn.TextColor3=Color3.new(1,1,1)
+    ToggleBtn.AutoLocalize=false
     local ToggleCorner=Instance.new("UICorner")
-    ToggleCorner.CornerRadius=4
-    ToggleCorner.Parent=toggleBtn
+    ToggleCorner.CornerRadius=ImGuiCore.WidgetCornerRadius
+    ToggleCorner.Parent=ToggleBtn
+    local function RefreshToggleVisual()
+        local newVal=ImGuiCore.WidgetStorage[cacheKey]
+        ToggleBtn.Text=newVal and "开启" or "关闭"
+        ToggleBtn.BackgroundColor3=newVal and Color3.new(rOn,gOn,bOn) or Color3.new(rOff,gOff,bOff)
+    end
+    ToggleBtn.MouseButton1Click:Connect(function()
+        ImGuiCore.WidgetStorage[cacheKey]=not ImGuiCore.WidgetStorage[cacheKey]
+        RefreshToggleVisual()
+        CallbackFunc(ImGuiCore.WidgetStorage[cacheKey])
+    end)
+    local HoverOn=TweenService:Create(ToggleBtn,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=Color3.new(math.clamp(rOn+0.1,0,1),math.clamp(gOn+0.1,0,1),math.clamp(bOn+0.1,0,1))})
+    local HoverOff=TweenService:Create(ToggleBtn,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=Color3.new(math.clamp(rOff+0.1,0,1),math.clamp(gOff+0.1,0,1),math.clamp(bOff+0.1,0,1))})
+    local IdleOn=TweenService:Create(ToggleBtn,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=Color3.new(rOn,gOn,bOn)})
+    local IdleOff=TweenService:Create(ToggleBtn,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=Color3.new(rOff,gOff,bOff)})
+    ToggleBtn.MouseEnter:Connect(function()
+        if ImGuiCore.WidgetStorage[cacheKey] then HoverOn:Play() else HoverOff:Play() end
+    end)
+    ToggleBtn.MouseLeave:Connect(function()
+        if ImGuiCore.WidgetStorage[cacheKey] then IdleOn:Play() else IdleOff:Play() end
+    end)
+    ToggleBtn.Parent=MainScrollFrame
 end
 
-local function RenderTabBar()
-    TabBarFrame:ClearAllChildren()
-    local tabCount=#ImGuiCore.TabList
-    if tabCount==0 then return end
-    local singleTabWidth=1/tabCount
-    for i,tabObj in ipairs(ImGuiCore.TabList)do
-        local tabBtn=Instance.new("TextButton")
-        tabBtn.Text=tabObj.Title
-        tabBtn.Font=Enum.Font.Gotham
-        tabBtn.TextSize=11
-        tabBtn.Size=UDim2.new(singleTabWidth,-2,1,-2)
-        tabBtn.Position=UDim2.new((i-1)*singleTabWidth,1,0,1)
-        tabBtn.BackgroundColor3=ImGuiCore.ActiveTab==tabObj and Color3.new(0.25,0.43,0.87) or Color3.new(0.18,0.18,0.22)
-        tabBtn.TextColor3=Color3.new(1,1,1)
-        tabBtn.MouseButton1Click:Connect(function() ImGuiCore.ActiveTab=tabObj end)
-        tabBtn.Parent=TabBarFrame
+local function CreateCollapseHeader(HeaderName,StorageKey,tooltipStr)
+    if ImGuiCore.CollapseState[StorageKey]==nil then
+        ImGuiCore.CollapseState[StorageKey]=false
+    end
+    local state=ImGuiCore.CollapseState[StorageKey]
+    local displayText=state and "[+] "..HeaderName or "[-] "..HeaderName
+    local CollapseBtn=CreateBaseButton(displayText,function()
+        ImGuiCore.CollapseState[StorageKey]=not ImGuiCore.CollapseState[StorageKey]
+    end,tooltipStr,{0.14,0.14,0.18})
+    return not ImGuiCore.CollapseState[StorageKey]
+end
+
+local function CreateSliderControl(LabelText,StorageKey,minVal,maxVal,stepSize,tooltipStr)
+    if ImGuiCore.SliderCache[StorageKey]==nil then
+        ImGuiCore.SliderCache[StorageKey]=math.clamp((minVal+maxVal)/2,minVal,maxVal)
+    end
+    local currentNum=ImGuiCore.SliderCache[StorageKey]
+    CreateTextLabel(LabelText.." = "..string.format("%.2f",currentNum),tooltipStr)
+    CreateBaseButton(LabelText.." +"..stepSize,function()
+        ImGuiCore.SliderCache[StorageKey]=math.clamp(ImGuiCore.SliderCache[StorageKey]+stepSize,minVal,maxVal)
+    end,"增加数值")
+    CreateBaseButton(LabelText.." -"..stepSize,function()
+        ImGuiCore.SliderCache[StorageKey]=math.clamp(ImGuiCore.SliderCache[StorageKey]-stepSize,minVal,maxVal)
+    end,"减少数值")
+end
+
+local function CreateInputField(HintText,StorageKey,tooltipStr)
+    if ImGuiCore.InputCache[StorageKey]==nil then
+        ImGuiCore.InputCache[StorageKey]=""
+    end
+    local InputBox=Instance.new("TextBox")
+    InputBox.PlaceholderText=HintText
+    InputBox.Text=ImGuiCore.InputCache[StorageKey]
+    InputBox.Font=ImGuiCore.GlobalFont
+    InputBox.TextSize=ImGuiCore.FontSizeBtn
+    InputBox.Size=UDim2.new(1,0,0,26)
+    InputBox.Position=UDim2.new(0,0,0,CurrentLayoutY)
+    InputBox.BackgroundColor3=Color3.new(ImGuiCore.InputBgRGB[1],ImGuiCore.InputBgRGB[2],ImGuiCore.InputBgRGB[3])
+    InputBox.BorderSizePixel=1
+    InputBox.BorderColor3=Color3.new(ImGuiCore.InputBorderRGB[1],ImGuiCore.InputBorderRGB[2],ImGuiCore.InputBorderRGB[3])
+    InputBox.TextColor3=Color3.new(ImGuiCore.TextMainRGB[1],ImGuiCore.TextMainRGB[2],ImGuiCore.TextMainRGB[3])
+    InputBox.PlaceholderColor3=Color3.new(ImGuiCore.TextHintRGB[1],ImGuiCore.TextHintRGB[2],ImGuiCore.TextHintRGB[3])
+    InputBox.AutoLocalize=false
+    InputBox.ClearTextOnFocus=false
+    InputBox.FocusLost:Connect(function(newText)
+        ImGuiCore.InputCache[StorageKey]=newText
+    end)
+    local InputCorner=Instance.new("UICorner")
+    InputCorner.CornerRadius=ImGuiCore.WidgetCornerRadius
+    InputCorner.Parent=InputBox
+    if tooltipStr and ImGuiCore.TooltipEnabled then
+        InputBox.MouseEnter:Connect(function()
+            TooltipLabel.Text=tooltipStr
+            TooltipFrame.Visible=true
+        end)
+        InputBox.MouseMove:Connect(function(input)
+            local mPos=UserInputService:GetMouseLocation()
+            TooltipFrame.Position=UDim2.new(0,mPos.X+12,0,mPos.Y+12)
+        end)
+        InputBox.MouseLeave:Connect(function()
+            TooltipFrame.Visible=false
+        end)
+    end
+    InputBox.Parent=MainScrollFrame
+    CurrentLayoutY=CurrentLayoutY+ImGuiCore.WidgetVerticalSpacing
+end
+
+local function CreateDropdownSelector(LabelText,StorageKey,OptionTable,tooltipStr)
+    if ImGuiCore.DropdownCache[StorageKey]==nil then
+        ImGuiCore.DropdownCache[StorageKey]=1
+    end
+    local selectedIdx=ImGuiCore.DropdownCache[StorageKey]
+    local selectedName=OptionTable[selectedIdx] or "None"
+    CreateTextLabel(LabelText.." 当前选中: "..selectedName,tooltipStr)
+    for idx,opt in ipairs(OptionTable) do
+        CreateBaseButton("选择: "..opt,function()
+            ImGuiCore.DropdownCache[StorageKey]=idx
+            print("已切换选项："..opt)
+        end,"点击切换为"..opt)
+    end
+end
+
+local function CreateRGBColorEditor(LabelName,RKey,GKey,BKey,tooltipStr)
+    CreateTextLabel(LabelName.." 调色板",tooltipStr)
+    CreateSeparatorLine()
+    CreateTextLabel("红色通道 R: "..string.format("%.2f",ImGuiCore[RKey][1]))
+    CreateBaseButton("R +0.05",function()
+        ImGuiCore[RKey][1]=math.clamp(ImGuiCore[RKey][1]+0.05,0,1)
+        print("红色增加0.05")
+    end)
+    CreateBaseButton("R -0.05",function()
+        ImGuiCore[RKey][1]=math.clamp(ImGuiCore[RKey][1]-0.05,0,1)
+        print("红色减少0.05")
+    end)
+    CreateTextLabel("绿色通道 G: "..string.format("%.2f",ImGuiCore[GKey][2]))
+    CreateBaseButton("G +0.05",function()
+        ImGuiCore[GKey][2]=math.clamp(ImGuiCore[GKey][2]+0.05,0,1)
+        print("绿色增加0.05")
+    end)
+    CreateBaseButton("G -0.05",function()
+        ImGuiCore[GKey][2]=math.clamp(ImGuiCore[GKey][2]-0.05,0,1)
+        print("绿色减少0.05")
+    end)
+    CreateTextLabel("蓝色通道 B: "..string.format("%.2f",ImGuiCore[BKey][3]))
+    CreateBaseButton("B +0.05",function()
+        ImGuiCore[BKey][3]=math.clamp(ImGuiCore[BKey][3]+0.05,0,1)
+        print("蓝色增加0.05")
+    end)
+    CreateBaseButton("B -0.05",function()
+        ImGuiCore[BKey][3]=math.clamp(ImGuiCore[BKey][3]-0.05,0,1)
+        print("蓝色减少0.05")
+    end)
+    CreateSeparatorLine()
+end
+
+local function RenderAllTabButtons()
+    TabBarHolder:ClearAllChildren()
+    local tabTotal=#ImGuiCore.TabList
+    if tabTotal<=0 then return end
+    local singleTabUnit=1/tabTotal
+    local tabGap=ImGuiCore.TabSpacing
+    for tabIndex,tabObj in ipairs(ImGuiCore.TabList) do
+        local TabBtn=Instance.new("TextButton")
+        TabBtn.Text=tabObj.Title
+        TabBtn.Font=ImGuiCore.GlobalFont
+        TabBtn.TextSize=ImGuiCore.FontSizeSmall
+        TabBtn.Size=UDim2.new(singleTabUnit,-tabGap*2,1,-2)
+        TabBtn.Position=UDim2.new((tabIndex-1)*singleTabUnit+tabGap,1,0,1)
+        local isActive=ImGuiCore.ActiveTabObj==tabObj
+        TabBtn.BackgroundColor3=isActive and Color3.new(ImGuiCore.TabActiveRGB[1],ImGuiCore.TabActiveRGB[2],ImGuiCore.TabActiveRGB[3]) or Color3.new(ImGuiCore.TabIdleRGB[1],ImGuiCore.TabIdleRGB[2],ImGuiCore.TabIdleRGB[3])
+        TabBtn.TextColor3=Color3.new(1,1,1)
+        TabBtn.AutoLocalize=false
+        TabBtn.MouseButton1Click:Connect(function()
+            ImGuiCore.ActiveTabObj=tabObj
+            print("切换分页："..tabObj.Title)
+        end)
         local TabBtnCorner=Instance.new("UICorner")
-        TabBtnCorner.CornerRadius=3
-        TabBtnCorner.Parent=tabBtn
+        TabBtn.CornerRadius=ImGuiCore.TabCornerRadius
+        TabBtnCorner.Parent=TabBtn
+        local TabHover=TweenService:Create(TabBtn,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=Color3.new(math.clamp(ImGuiCore.TabIdleRGB[1]+0.08,0,1),math.clamp(ImGuiCore.TabIdleRGB[2]+0.08,0,1),math.clamp(ImGuiCore.TabIdleRGB[3]+0.08,0,1))})
+        local TabIdle=TweenService:Create(TabBtn,TweenInfo.new(ImGuiCore.TweenSpeed),{BackgroundColor3=isActive and Color3.new(ImGuiCore.TabActiveRGB[1],ImGuiCore.TabActiveRGB[2],ImGuiCore.TabActiveRGB[3]) or Color3.new(ImGuiCore.TabIdleRGB[1],ImGuiCore.TabIdleRGB[2],ImGuiCore.TabIdleRGB[3])})
+        TabBtn.MouseEnter:Connect(function() TabHover:Play() end)
+        TabBtn.MouseLeave:Connect(function() TabIdle:Play() end)
+        TabBtn.Parent=TabBarHolder
     end
 end
 
-TitleBar.InputBegan:Connect(function(input)
-    if input.UserInputType==Enum.UserInputType.MouseButton1 then ImGuiCore.DragActive=UserInputService:GetMouseLocation() end
+TitleBarContainer.InputBegan:Connect(function(inputObj)
+    if inputObj.UserInputType==Enum.UserInputType.MouseButton1 then
+        ImGuiCore.DragActive=true
+        ImGuiCore.DragMouseOrigin=UserInputService:GetMouseLocation()
+        ImGuiCore.WindowPosOrigin=ImGuiCore.WindowPos
+    end
 end)
-ResizeHandle.InputBegan:Connect(function(input)
-    if input.UserInputType==Enum.UserInputType.MouseButton1 then ImGuiCore.ResizeActive=UserInputService:GetMouseLocation() end
+ResizeDragHandle.InputBegan:Connect(function(inputObj)
+    if inputObj.UserInputType==Enum.UserInputType.MouseButton1 then
+        ImGuiCore.ResizeActive=true
+        ImGuiCore.ResizeMouseOrigin=UserInputService:GetMouseLocation()
+        ImGuiCore.WindowSizeOrigin=ImGuiCore.WindowSize
+    end
 end)
-UserInputService.InputChanged:Connect(function(input)
+UserInputService.InputChanged:Connect(function(inputObj)
     local mousePos=UserInputService:GetMouseLocation()
-    if ImGuiCore.DragActive and input.UserInputType==Enum.UserInputType.MouseMovement then
-        local delta=mousePos-ImGuiCore.DragActive
-        ImGuiCore.WindowPos=ImGuiCore.WindowPos+UDim2.new(0,delta.X,0,delta.Y)
-        WinFrame.Position=ImGuiCore.WindowPos
-        ImGuiCore.DragActive=mousePos
+    if ImGuiCore.DragActive and inputObj.UserInputType==Enum.UserInputType.MouseMovement then
+        local deltaVec=mousePos-ImGuiCore.DragMouseOrigin
+        ImGuiCore.WindowPos=UDim2.new(ImGuiCore.WindowPosOrigin.X.Scale,ImGuiCore.WindowPosOrigin.X.Offset+deltaVec.X,ImGuiCore.WindowPosOrigin.Y.Scale,ImGuiCore.WindowPosOrigin.Y.Offset+deltaVec.Y)
+        MainWindowFrame.Position=ImGuiCore.WindowPos
     end
-    if ImGuiCore.ResizeActive and input.UserInputType==Enum.UserInputType.MouseMovement then
-        local delta=mousePos-ImGuiCore.ResizeActive
-        local newW=math.max(ImGuiCore.WindowSize.X.Offset+delta.X,ImGuiCore.MinSize.X)
-        local newH=math.max(ImGuiCore.WindowSize.Y.Offset+delta.Y,ImGuiCore.MinSize.Y)
+    if ImGuiCore.ResizeActive and inputObj.UserInputType==Enum.UserInputType.MouseMovement then
+        local deltaVec=mousePos-ImGuiCore.ResizeMouseOrigin
+        local newW=ImGuiCore.WindowSizeOrigin.X.Offset+deltaVec.X
+        local newH=ImGuiCore.WindowSizeOrigin.Y.Offset+deltaVec.Y
+        newW=math.clamp(newW,ImGuiCore.MinWindowWidth,ImGuiCore.MaxWindowWidth)
+        newH=math.clamp(newH,ImGuiCore.MinWindowHeight,ImGuiCore.MaxWindowHeight)
         ImGuiCore.WindowSize=UDim2.new(0,newW,0,newH)
-        WinFrame.Size=ImGuiCore.WindowSize
-        ImGuiCore.ResizeActive=mousePos
+        MainWindowFrame.Size=ImGuiCore.WindowSize
     end
 end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType==Enum.UserInputType.MouseButton1 then
+UserInputService.InputEnded:Connect(function(inputObj)
+    if inputObj.UserInputType==Enum.UserInputType.MouseButton1 then
         ImGuiCore.DragActive=nil
         ImGuiCore.ResizeActive=nil
     end
 end)
-MinBtn.MouseButton1Click:Connect(function()
-    if ImGuiCore.WindowSize.Y.Offset>130 then
-        ImGuiCore.WindowSize=UDim2.new(0,420,0,120)
-        MinBtn.Text="▼"
+MinimizeToggleBtn.MouseButton1Click:Connect(function()
+    ImGuiCore.WindowMinimized=not ImGuiCore.WindowMinimized
+    if ImGuiCore.WindowMinimized then
+        ImGuiCore.WindowSize=UDim2.new(ImGuiCore.WindowSize.X.Scale,ImGuiCore.WindowSize.X.Offset,0,ImGuiCore.MinWindowHeight)
+        MinimizeToggleBtn.Text="▼"
+        print("窗口最小化")
     else
-        ImGuiCore.WindowSize=UDim2.new(0,540,0,480)
-        MinBtn.Text="▲"
+        ImGuiCore.WindowSize=UDim2.new(ImGuiCore.WindowSize.X.Scale,ImGuiCore.WindowSize.X.Offset,0,ImGuiCore.FullWindowHeight)
+        MinimizeToggleBtn.Text="▲"
+        print("窗口展开")
     end
-    WinFrame.Size=ImGuiCore.WindowSize
+    MainWindowFrame.Size=ImGuiCore.WindowSize
 end)
 
 local TabClass={}
 TabClass.__index=TabClass
-function TabClass:Button(opt)
-    if ImGuiCore.ActiveTab~=self then return end
-    CreateNormalButton(opt.Title,opt.Callback)
+function TabClass:Button(optTable)
+    if ImGuiCore.ActiveTabObj~=self then return end
+    local title=optTable.Title or "按钮"
+    local callback=optTable.Callback or function() print("点击了按钮："..title) end
+    local tip=optTable.Tooltip or "点击执行功能"
+    CreateBaseButton(title,callback,tip)
 end
-function TabClass:Toggle(opt)
-    if ImGuiCore.ActiveTab~=self then return end
-    CreateIconToggle(opt.Title,opt.Icon,opt.Value,opt.Callback)
+function TabClass:Toggle(optTable)
+    if ImGuiCore.ActiveTabObj~=self then return end
+    local title=optTable.Title
+    local icon=optTable.Icon
+    local val=optTable.Value or false
+    local callback=optTable.Callback or function(state) print(title.." 当前状态："..tostring(state)) end
+    local tip=optTable.Tooltip or "点击切换开关状态"
+    CreateIconToggle(title,icon,val,callback,tip)
+end
+function TabClass:Collapse(optTable)
+    if ImGuiCore.ActiveTabObj~=self then return end
+    local name=optTable.Name
+    local key=optTable.Storage
+    local tip=optTable.Tooltip or "展开/折叠分组"
+    return CreateCollapseHeader(name,key,tip)
+end
+function TabClass:Slider(optTable)
+    if ImGuiCore.ActiveTabObj~=self then return end
+    local label=optTable.Label
+    local key=optTable.Storage
+    local min=optTable.Min
+    local max=optTable.Max
+    local step=optTable.Step
+    local tip=optTable.Tooltip or "调整数值大小"
+    CreateSliderControl(label,key,min,max,step,tip)
+end
+function TabClass:Input(optTable)
+    if ImGuiCore.ActiveTabObj~=self then return end
+    local hint=optTable.Hint
+    local key=optTable.Storage
+    local tip=optTable.Tooltip or "输入自定义文字"
+    CreateInputField(hint,key,tip)
+end
+function TabClass:Combo(optTable)
+    if ImGuiCore.ActiveTabObj~=self then return end
+    local label=optTable.Label
+    local key=optTable.Storage
+    local opts=optTable.Options
+    local tip=optTable.Tooltip or "选择对应选项"
+    CreateDropdownSelector(label,key,opts,tip)
+end
+function TabClass:ColorEdit(optTable)
+    if ImGuiCore.ActiveTabObj~=self then return end
+    local name=optTable.Label
+    local rk=optTable.RStore
+    local gk=optTable.GStore
+    local bk=optTable.BStore
+    local tip=optTable.Tooltip or "自定义RGB颜色"
+    CreateRGBColorEditor(name,rk,gk,bk,tip)
+end
+function TabClass:Text(textStr,tip)
+    if ImGuiCore.ActiveTabObj~=self then return end
+    CreateTextLabel(textStr,tip or "纯文字说明")
+end
+function TabClass:Separator()
+    if ImGuiCore.ActiveTabObj~=self then return end
+    CreateSeparatorLine()
 end
 
 Window={}
 Tabs={}
-function Window:AddTab(tabName)
-    local newTab=setmetatable({Title=tabName},TabClass)
-    table.insert(ImGuiCore.TabList,newTab)
-    return newTab
+function Window:AddTab(tabDisplayName)
+    local newTabObj=setmetatable({Title=tabDisplayName},TabClass)
+    table.insert(ImGuiCore.TabList,newTabObj)
+    Tabs[tabDisplayName]=newTabObj
+    return newTabObj
 end
 
 ImGui={}
-function ImGui.SetWindowTitle(str)
-    ImGuiCore.WindowTitle=str
-    WinTitleLabel.Text=str
+function ImGui.SetWindowTitle(newTitleStr)
+    ImGuiCore.WindowTitle=newTitleStr
+    TitleTextLabel.Text=newTitleStr
+    print("窗口标题已修改为："..newTitleStr)
+end
+function ImGui.SetWindowTransparency(val)
+    ImGuiCore.WindowTransparency=math.clamp(val,0,1)
+    MainWindowFrame.BackgroundTransparency=ImGuiCore.WindowTransparency
+    print("窗口透明度设置："..val)
 end
 function ImGui.SetBgColor(r,g,b)
-    ImGuiCore.BgColor={r,g,b}
+    ImGuiCore.BgRGB={math.clamp(r,0,1),math.clamp(g,0,1),math.clamp(b,0,1)}
+    print("背景颜色已更新")
 end
-function ImGui.SetTitleBarColor(r,g,b)
-    ImGuiCore.TitleBarColor={r,g,b}
-    TitleBar.BackgroundColor3=Color3.new(r,g,b)
+function ImGui.SetTitleColor(r,g,b)
+    ImGuiCore.TitleBarRGB={math.clamp(r,0,1),math.clamp(g,0,1),math.clamp(b,0,1)}
+    TitleBarContainer.BackgroundColor3=Color3.new(ImGuiCore.TitleBarRGB[1],ImGuiCore.TitleBarRGB[2],ImGuiCore.TitleBarRGB[3])
+    print("标题栏颜色已更新")
 end
-function ImGui.SetButtonColor(r,g,b)
-    ImGuiCore.ButtonColor={r,g,b}
+function ImGui.SetMainButtonColor(r,g,b)
+    ImGuiCore.MainBtnRGB={math.clamp(r,0,1),math.clamp(g,0,1),math.clamp(b,0,1)}
+    print("按钮颜色已更新")
 end
-function ImGui.SetToggleColor(onR,onG,onB,offR,offG,offB)
-    ImGuiCore.ToggleOnColor={onR,onG,onB}
-    ImGuiCore.ToggleOffColor={offR,offG,offB}
+function ImGui.SetToggleColors(onR,onG,onB,offR,offG,offB)
+    ImGuiCore.ToggleOnRGB={math.clamp(onR,0,1),math.clamp(onG,0,1),math.clamp(onB,0,1)}
+    ImGuiCore.ToggleOffRGB={math.clamp(offR,0,1),math.clamp(offG,0,1),math.clamp(offB,0,1)}
+    print("开关颜色已更新")
+end
+function ImGui.SetWindowVisible(bool)
+    ImGuiCore.WindowVisible=bool
+    MainWindowFrame.Visible=bool
+    if bool then print("界面显示") else print("界面隐藏") end
+end
+function ImGui.ResetAllWidgetCache()
+    ImGuiCore.WidgetStorage={}
+    ImGuiCore.CollapseState={}
+    ImGuiCore.SliderCache={}
+    ImGuiCore.DropdownCache={}
+    ImGuiCore.InputCache={}
+    print("所有控件数据重置完成")
+end
+function ImGui.SetTooltipEnabled(bool)
+    ImGuiCore.TooltipEnabled=bool
 end
 
-local function RenderImGui()
+local function FullImGuiRenderLoop()
     if not ImGuiCore.WindowVisible then return end
-    ClearCanvas()
-    if ImGuiCore.CustomBg then
-        WinFrame.BackgroundColor3=Color3.new(ImGuiCore.BgColor[1],ImGuiCore.BgColor[2],ImGuiCore.BgColor[3])
-    else
-        WinFrame.BackgroundColor3=Color3.new(0.11,0.11,0.13)
-    end
-    RenderTabBar()
-    ScrollContent.CanvasSize=UDim2.new(0,0,0,LayoutY+30)
+    ClearScrollCanvas()
+    RenderAllTabButtons()
+    local activeTab=ImGuiCore.ActiveTabObj
+    if not activeTab then return end
+    MainScrollFrame.CanvasSize=UDim2.new(0,0,0,CurrentLayoutY+60)
+    WinFrame.BackgroundColor3=Color3.new(ImGuiCore.BgRGB[1],ImGuiCore.BgRGB[2],ImGuiCore.BgRGB[3])
 end
-RunService.RenderStepped:Connect(RenderImGui)
+
+RunService.RenderStepped:Connect(FullImGuiRenderLoop)
